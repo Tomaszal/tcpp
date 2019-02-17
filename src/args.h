@@ -15,4 +15,7 @@ Arguments *args;
 
 void args_parse(int argc, char **argv);
 
+int verbose_printf(const char *restrict format, ...);
+int normal_printf(const char *restrict format, ...);
+
 #endif //TCPP_ARGS_H

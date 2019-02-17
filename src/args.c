@@ -2,6 +2,7 @@
 #include <error.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include "args.h"
 
 /* Program information. */
@@ -74,6 +75,11 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
                 }
             }
 
+            if (args->verbose && args->quiet) {
+                fprintf(stderr, "Cannot be verbose and quiet at the same time.\n\n");
+                argp_usage(state);
+            }
+
             break;
 
         default:
@@ -81,6 +87,40 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     }
 
     return 0;
+}
+
+/* Write formatted output to stdout if ACTIVE is true.
+ *
+ * Adapted from StackOverflow answer:
+ * https://stackoverflow.com/a/36096037/7353602 */
+int verbose_printf(const char *restrict format, ...) {
+    if (!args->verbose) {
+        return 0;
+    }
+
+    va_list ap;
+    va_start(ap, format);
+    int ret = vprintf(format, ap);
+    va_end(ap);
+
+    return ret;
+}
+
+/* Write formatted output to stdout if QUIET is false.
+ *
+ * Adapted from StackOverflow answer:
+ * https://stackoverflow.com/a/36096037/7353602 */
+int normal_printf(const char *restrict format, ...) {
+    if (args->quiet) {
+        return 0;
+    }
+
+    va_list ap;
+    va_start(ap, format);
+    int ret = vprintf(format, ap);
+    va_end(ap);
+
+    return ret;
 }
 
 /* Parse the options strings in ARGC & ARGV into ARGS structure using ARGP. */
