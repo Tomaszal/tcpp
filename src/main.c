@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "args.h"
 
 /* Token structure for file tokenization.
  * Stores token information and pointers to its neighboring tokens.
@@ -89,5 +90,8 @@ void read_file() {
 }
 
 int main(int argc, char **argv) {
+    // Parse program arguments
+    args_parse(argc, argv);
+
     exit(EXIT_SUCCESS);
 }
