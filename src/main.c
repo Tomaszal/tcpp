@@ -1,3 +1,21 @@
+/**
+ * @brief Tomaszal's C preprocessor (TCPP)
+ *
+ * A C preprocessor implements the macro language used to transform C programs before they are compiled.
+ *
+ * This project is an attempt to recreate the essential parts of GCC's built in C preprocessor (CPP).
+ *
+ * TODO: Inclusion of header files
+ * TODO: Macro expansions
+ * TODO: Conditional compilation
+ * TODO: Line control
+ *
+ * GCC CPP documentation: https://gcc.gnu.org/onlinedocs/cpp/
+ *
+ * @author Tomas Zaluckij (@Tomaszal) <mrtomaszal@gmail.com>
+ * @date Last modified 2019-02-27
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

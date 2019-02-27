@@ -1,10 +1,15 @@
-# Tomaszal's C PreProcessor (tcpp)
+# Tomaszal's C preprocessor (TCPP)
 
-This is a preprocessor for Edinburgh Napier University's [SET07109](http://www.modules.napier.ac.uk/Module.aspx?ID=set07109) module's first coursework.
+A C preprocessor implements the macro language used to transform C programs before they are compiled.
+
+This project is an attempt to recreate the essential parts of GCC's built in C preprocessor (CPP). It started out as a simple coursework for the [SET07109](http://www.modules.napier.ac.uk/Module.aspx?ID=set07109) module, but quickly morphed into this 
+complex and challenging idea.
+
+[GCC CPP documentation](https://gcc.gnu.org/onlinedocs/cpp/)
 
 ```
 Usage: tcpp [OPTION...]
-Tomaszal's C PreProcessor (tcpp) -- a program for preprocessing C computer
+Tomaszal's C preprocessor (TCPP) -- a program for preprocessing C computer
 programming language.
 
   -c, --keep_comments        Keep the comments instead of removing them

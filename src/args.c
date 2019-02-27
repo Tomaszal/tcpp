@@ -16,7 +16,7 @@ const char *argp_program_bug_address =
  * Passed into the DOC field of the ARGP structure.
  */
 static char doc[] =
-        "Tomaszal's C PreProcessor (tcpp) -- a program for preprocessing C computer programming language.";
+        "Tomaszal's C preprocessor (TCPP) -- a program for preprocessing C computer programming language.";
 
 /**
  * An array of accepted ARGP_OPTION's.
