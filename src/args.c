@@ -5,19 +5,24 @@
 #include <stdarg.h>
 #include "args.h"
 
-/* Program information. */
 const char *argp_program_version =
         "tcpp 0.1";
 const char *argp_program_bug_address =
         "<mrtomaszal@gmail.com>";
 
-/* Program documentation.
- * Passed in the DOC field of the ARGP structure. */
+/**
+ * Program documentation.
+ *
+ * Passed into the DOC field of the ARGP structure.
+ */
 static char doc[] =
         "Tomaszal's C PreProcessor (tcpp) -- a program for preprocessing C computer programming language.";
 
-/* An array of accepted ARGP_OPTION's.
- * Passed in the OPTIONS field of the ARGP structure. */
+/**
+ * An array of accepted ARGP_OPTION's.
+ *
+ * Passed into the OPTIONS field of the ARGP structure.
+ */
 static struct argp_option options[] = {
         {"verbose",       'v', 0,        0, "Produce verbose output"},
         {"quiet",         'q', 0,        0, "Do not produce any output at all"},
@@ -28,8 +33,16 @@ static struct argp_option options[] = {
         {0}
 };
 
-/* A function that deals with parsing a ARGP_OPTION.
- * Passed in the PARSER field of the ARGP structure. */
+/**
+ * Parses an ARGP_OPTION.
+ *
+ * Passed into the PARSER field of the ARGP structure.
+ *
+ * @param key A key associated with an option.
+ * @param arg An argument associated with the key.
+ * @param state The current state of argument parsing.
+ * @return 0 if successful, error code otherwise.
+ */
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     Arguments *args = state->input;
 
@@ -89,10 +102,16 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     return 0;
 }
 
-/* Write formatted output to stdout if ACTIVE is true.
+/**
+ * Verbose version of printf. Writes formatted output to stdout only if ACTIVE argument is true.
  *
  * Adapted from StackOverflow answer:
- * https://stackoverflow.com/a/36096037/7353602 */
+ * https://stackoverflow.com/a/36096037/7353602
+ *
+ * @param format A format specifier string.
+ * @param ... Additional arguments.
+ * @return 0 if suppressed. A total number of characters written if successful. A negative number is returned.
+ */
 int verbose_printf(const char *restrict format, ...) {
     if (!args->verbose) {
         return 0;
@@ -106,10 +125,16 @@ int verbose_printf(const char *restrict format, ...) {
     return ret;
 }
 
-/* Write formatted output to stdout if QUIET is false.
+/**
+ * Quiet version of printf. Writes formatted output to stdout only if QUIET argument is false.
  *
  * Adapted from StackOverflow answer:
- * https://stackoverflow.com/a/36096037/7353602 */
+ * https://stackoverflow.com/a/36096037/7353602
+ *
+ * @param format A format specifier string.
+ * @param ... Additional arguments.
+ * @return 0 if suppressed. A total number of characters written if successful. A negative number is returned.
+ */
 int normal_printf(const char *restrict format, ...) {
     if (args->quiet) {
         return 0;
@@ -123,7 +148,12 @@ int normal_printf(const char *restrict format, ...) {
     return ret;
 }
 
-/* Parse the options strings in ARGC & ARGV into ARGS structure using ARGP. */
+/**
+ * Parses the option strings into global arguments array ARGS.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ */
 void args_parse(int argc, char **argv) {
     struct argp argp = {options, parse_opt, 0, doc};
     args = calloc(1, sizeof *args);
