@@ -5,15 +5,10 @@
  *
  * This project is an attempt to recreate the essential parts of GCC's built in C preprocessor (CPP).
  *
- * TODO: Inclusion of header files
- * TODO: Macro expansions
- * TODO: Conditional compilation
- * TODO: Line control
- *
  * GCC CPP documentation: https://gcc.gnu.org/onlinedocs/cpp/
  *
  * @author Tomas Zaluckij (@Tomaszal) <mrtomaszal@gmail.com>
- * @date Last modified 2019-02-27
+ * @date Last modified 2019-02-28
  */
 
 #include <stdlib.h>
@@ -26,7 +21,7 @@
  * Stores location in a file.
  */
 typedef struct Location {
-    char *filename;
+    char *file_name;
 
     int line;
     int column;
@@ -36,13 +31,13 @@ typedef struct Location {
  * Stores token information and pointers to its neighboring tokens, creating a doubly-linked list.
  */
 typedef struct Token {
+    char *string;
+    char operator;
+
     int is_identifier;
     int is_number;
     int is_comment;
     int is_directive;
-
-    char *string;
-    char operator;
 
     Location location;
 
@@ -79,8 +74,9 @@ Token *new_token(char *string, Location end_location) {
     Token *token = calloc(1, sizeof *token);
 
     token->string = string;
-    token->location.line = end_location.line;
-    token->location.column = end_location.column - (int) strlen(token->string);
+
+    token->location = end_location;
+    token->location.column -= (int) strlen(token->string);
 
     return token;
 }
@@ -91,10 +87,11 @@ Token *new_token(char *string, Location end_location) {
  * @param token The token to which to set the flags to.
  */
 void set_token_flags(Token *token) {
+    token->operator = (char) ((token->string[1] == '\0') ? token->string[0] : '\0');
+
     token->is_identifier = is_identifier(token->string[0]);
     token->is_number = isdigit(token->string[0]);
     token->is_comment = token->string[0] == '/' && (token->string[1] == '/' || token->string[1] == '*');
-    token->operator = (char) ((token->string[1] == '\0') ? token->string[0] : '\0');
     token->is_directive = token->prev && token->prev->operator == '#';
 }
 
@@ -329,25 +326,31 @@ char *f_read_until(FILE *ifs, char start, char end, Location *location) {
  * @return A new string with contents of the token list.
  */
 void stringify_token_list(TokenList *token_list) {
-    Location location;
-    location.line = 1;
-    location.column = 0;
+    Location location = {NULL, 0, 0};
 
     for (Token *token = token_list->front_token; token; token = token->next) {
+        if (token->location.file_name != location.file_name) {
+            location = token->location;
+        }
+
         while (token->location.line > location.line) {
-            printf("\n");
             location.line++;
             location.column = 0;
+
+            printf("\n");
         }
 
         while (token->location.column > location.column) {
             location.column++;
+
             printf(" ");
         }
 
-        location.column += strlen(token->string);
+        if (token->string) {
+            location.column += strlen(token->string);
 
-        printf("%s", token->string);
+            printf("%s", token->string);
+        }
     }
 }
 
@@ -361,13 +364,11 @@ void stringify_token_list(TokenList *token_list) {
  */
 int count_non_empty_lines(TokenList *token_list) {
     int num = 0;
-
-    Location location;
-    location.line = 0;
+    int current_line = 0;
 
     for (Token *token = token_list->front_token; token; token = token->next) {
-        if (token->location.line > location.line) {
-            location.line = token->location.line;
+        if (token->location.line > current_line) {
+            current_line = token->location.line;
             num++;
         }
     }
@@ -423,17 +424,15 @@ TokenList *tokenize_file(char *file_name) {
     FILE *ifs = fopen(file_name, "r");
 
     if (!ifs) {
-        fprintf(stderr, "Could not open %s.", file_name);
+        fprintf(stderr, "Could not open file %s.\n", file_name);
         exit(EXIT_FAILURE);
     }
 
     verbose_printf("Tokenizing file %s.\n", file_name);
 
-    char ch;
     TokenList *token_list = calloc(1, sizeof *token_list);
-    Location location;
-    location.line = 1;
-    location.column = 0;
+    Location location = {file_name, 1, 0};
+    char ch;
 
     while (f_read_char(ifs, &ch, &location)) {
         if (isspace(ch)) {
@@ -493,11 +492,113 @@ TokenList *tokenize_file(char *file_name) {
     return token_list;
 }
 
+/**
+ * Preprocesses a list of raw tokens.
+ *
+ * TODO: Inclusion of header files (~40%)
+ *  > Search for files in other folders (how GCC does it)
+ *  > Implement system file inclusion
+ * TODO: Macro expansions
+ * TODO: Conditional compilation
+ * TODO: Line control
+ * TODO: Other directives
+ *
+ * @param token_list A token list to preprocess.
+ * @param file_vector Pointer to an array of open file names.
+ */
+void preprocess_token_list(TokenList *token_list, char ***file_vector) {
+    if (!token_list->front_token) {
+        return;
+    }
+
+    char *file_path = malloc((strlen(token_list->front_token->location.file_name) + 1) * sizeof *file_path);
+    strcpy(file_path, token_list->front_token->location.file_name);
+
+    for (char *file_name = &file_path[strlen(file_path)]; file_name != file_path; file_name -= sizeof *file_name) {
+        if (*file_name == '/') {
+            file_name[1] = '\0';
+            break;
+        }
+    }
+
+    for (Token *token = token_list->front_token; token; token = token->next) {
+        if (token->is_directive) {
+            if (strcmp(token->string, "include") == 0) {
+                token = token->next;
+
+                char *file_name = NULL;
+
+                if (token->string[0] == '"') {
+                    file_name = malloc((strlen(file_path) + strlen(&token->string[1])) * sizeof file_name);
+                    strcpy(file_name, file_path);
+                    strncat(file_name, &token->string[1], strlen(&token->string[1]) - 1);
+                }
+
+                if (!file_name) {
+                    fprintf(stderr, "Could not find '%s'.\n", token->string);
+                    continue;
+                }
+
+                int file_vector_size = 0;
+                while ((*file_vector)[++file_vector_size]) {}
+
+                *file_vector = realloc(*file_vector, (file_vector_size + 2) * sizeof **file_vector);
+                (*file_vector)[file_vector_size] = file_name;
+                (*file_vector)[file_vector_size + 1] = NULL;
+
+                TokenList *temp_token_list = tokenize_file((*file_vector)[file_vector_size]);
+
+                if (token->next) {
+                    Token *spacer_token = calloc(1, sizeof *spacer_token);
+
+                    spacer_token->string = NULL;
+                    spacer_token->location = token->location;
+
+                    spacer_token->prev = token;
+                    spacer_token->next = token->next;
+
+                    token->next->prev = spacer_token;
+                    token->next = spacer_token;
+                }
+
+                token = token->prev->prev;
+
+                for (int i = 0; i < 3; i++) {
+                    token = delete_token_from_list(temp_token_list, token);
+                }
+
+                if (!token) {
+                    free(token_list);
+                    token_list = temp_token_list;
+                }
+
+                if (token->prev) {
+                    token->prev->next = temp_token_list->front_token;
+                    temp_token_list->front_token->prev = token->prev;
+                } else {
+                    token_list->front_token = temp_token_list->front_token;
+                }
+
+                token->prev = temp_token_list->back_token;
+                temp_token_list->back_token->next = token;
+
+                free(temp_token_list);
+            }
+        }
+    }
+
+    free(file_path);
+}
+
 int main(int argc, char **argv) {
     // Parse program arguments
     args_parse(argc, argv);
 
-    TokenList *token_list = tokenize_file(args->input_file);
+    char **file_vector = malloc(2 * sizeof *file_vector);
+    file_vector[0] = args->input_file;
+    file_vector[1] = NULL;
+
+    TokenList *token_list = tokenize_file(file_vector[0]);
 
     normal_printf("%d non-empty lines found.\n", count_non_empty_lines(token_list));
     normal_printf("%d comments found.\n", count_comments(token_list));
@@ -505,6 +606,8 @@ int main(int argc, char **argv) {
     if (!args->keep_comments) {
         delete_comments(token_list);
     }
+
+    preprocess_token_list(token_list, &file_vector);
 
     stringify_token_list(token_list);
 
