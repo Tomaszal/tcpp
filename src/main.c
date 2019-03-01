@@ -8,7 +8,7 @@
  * GCC CPP documentation: https://gcc.gnu.org/onlinedocs/cpp/
  *
  * @author Tomas Zaluckij (@Tomaszal) <mrtomaszal@gmail.com>
- * @date Last modified 2019-02-28
+ * @date Last modified 2019-03-01
  */
 
 #include <stdlib.h>
@@ -16,6 +16,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "args.h"
+#include "hashmap.h"
 
 /**
  * Stores location in a file.
@@ -26,6 +27,17 @@ typedef struct Location {
     int line;
     int column;
 } Location;
+
+/**
+ * Checks if two given locations are on the same line.
+ *
+ * @param loc1 The first location.
+ * @param loc2 The second location.
+ * @return 1 if they are, 0 otherwise.
+ */
+int same_line(Location loc1, Location loc2) {
+    return loc1.line == loc2.line && loc1.file_name == loc2.file_name;
+}
 
 /**
  * Stores token information and pointers to its neighboring tokens, creating a doubly-linked list.
@@ -93,6 +105,12 @@ void set_token_flags(Token *token) {
     token->is_number = isdigit(token->string[0]);
     token->is_comment = token->string[0] == '/' && (token->string[1] == '/' || token->string[1] == '*');
     token->is_directive = token->prev && token->prev->operator == '#';
+
+    if (token->is_directive) {
+        if (token->prev->prev && same_line(token->prev->location, token->prev->prev->location)) {
+            token->is_directive = 0;
+        }
+    }
 }
 
 /**
@@ -318,18 +336,27 @@ char *f_read_until(FILE *ifs, char start, char end, Location *location) {
 }
 
 /**
- * Converts a token list into a string.
+ * Writes a token list to a file.
  *
- * TODO: finish stringify function (add actual string generation and return)
- *
- * @param token_list A token list to stringify.
- * @return A new string with contents of the token list.
+ * @param token_list A token list to write.
+ * @param file_name The location of the file to write to.
  */
-void stringify_token_list(TokenList *token_list) {
+void write_token_list_to_file(TokenList *token_list, char *file_name) {
+    FILE *ofs = fopen(file_name, "w");
+
+    if (!ofs) {
+        fprintf(stderr, "Could not open or create file %s.\n", file_name);
+        return;
+    }
+
     Location location = {NULL, 0, 0};
 
     for (Token *token = token_list->front_token; token; token = token->next) {
         if (token->location.file_name != location.file_name) {
+            if (location.line != 0) {
+                fprintf(ofs, "\n");
+            }
+
             location = token->location;
         }
 
@@ -337,21 +364,23 @@ void stringify_token_list(TokenList *token_list) {
             location.line++;
             location.column = 0;
 
-            printf("\n");
+            fprintf(ofs, "\n");
         }
 
         while (token->location.column > location.column) {
             location.column++;
 
-            printf(" ");
+            fprintf(ofs, " ");
         }
 
         if (token->string) {
             location.column += strlen(token->string);
 
-            printf("%s", token->string);
+            fprintf(ofs, "%s", token->string);
         }
     }
+
+    fprintf(ofs, "\n");
 }
 
 /**
@@ -498,7 +527,7 @@ TokenList *tokenize_file(char *file_name) {
  * TODO: Inclusion of header files (~40%)
  *  > Search for files in other folders (how GCC does it)
  *  > Implement system file inclusion
- * TODO: Macro expansions
+ * TODO: Macro expansions (~15)
  * TODO: Conditional compilation
  * TODO: Line control
  * TODO: Other directives
@@ -521,6 +550,8 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
         }
     }
 
+    HashMap *define_map = new_hash_map(0xffff, 0xb5c236b5);
+
     for (Token *token = token_list->front_token; token; token = token->next) {
         if (token->is_directive) {
             if (strcmp(token->string, "include") == 0) {
@@ -529,7 +560,7 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
                 char *file_name = NULL;
 
                 if (token->string[0] == '"') {
-                    file_name = malloc((strlen(file_path) + strlen(&token->string[1])) * sizeof file_name);
+                    file_name = malloc((strlen(file_path) + strlen(&token->string[1])) * sizeof *file_name);
                     strcpy(file_name, file_path);
                     strncat(file_name, &token->string[1], strlen(&token->string[1]) - 1);
                 }
@@ -548,23 +579,10 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
 
                 TokenList *temp_token_list = tokenize_file((*file_vector)[file_vector_size]);
 
-                if (token->next) {
-                    Token *spacer_token = calloc(1, sizeof *spacer_token);
-
-                    spacer_token->string = NULL;
-                    spacer_token->location = token->location;
-
-                    spacer_token->prev = token;
-                    spacer_token->next = token->next;
-
-                    token->next->prev = spacer_token;
-                    token->next = spacer_token;
-                }
-
                 token = token->prev->prev;
 
                 for (int i = 0; i < 3; i++) {
-                    token = delete_token_from_list(temp_token_list, token);
+                    token = delete_token_from_list(token_list, token);
                 }
 
                 if (!token) {
@@ -583,10 +601,47 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
                 temp_token_list->back_token->next = token;
 
                 free(temp_token_list);
+
+            } else if (strcmp(token->string, "define") == 0) {
+
+                Token *start_token = token->prev;
+                token = token->next->next;
+
+                char *string = malloc(sizeof *string);
+                *string = '\0';
+
+                Location line = token->location;
+                while (same_line(token->location, line)) {
+                    string = realloc(string, (strlen(string) + strlen(token->string) + 1) * sizeof *string);
+                    strcat(string, token->string);
+                    token = delete_token_from_list(token_list, token);
+                }
+
+                hash_map_insert_key(define_map, start_token->next->next->string, string);
+
+                token = start_token;
+                for (int i = 0; i < 3; i++) {
+                    token = delete_token_from_list(token_list, token);
+                }
+            }
+        } else {
+            char *define = (char *) hash_map_get_key(define_map, token->string);
+            if (define) {
+                int spacing_fix = (int) strlen(token->string) - (int) strlen(define);
+
+                free(token->string);
+                token->string = malloc(strlen(define) * sizeof token->string);
+                strcpy(token->string, define);
+
+                Token *temp_token = token;
+                while ((temp_token = temp_token->next) && same_line(token->location, temp_token->location)) {
+                    temp_token->location.column -= spacing_fix;
+                }
             }
         }
     }
 
+    delete_hash_map(define_map);
     free(file_path);
 }
 
@@ -609,7 +664,7 @@ int main(int argc, char **argv) {
 
     preprocess_token_list(token_list, &file_vector);
 
-    stringify_token_list(token_list);
+    write_token_list_to_file(token_list, args->output_file);
 
     delete_token_list(token_list);
 
