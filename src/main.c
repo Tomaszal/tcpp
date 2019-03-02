@@ -8,7 +8,7 @@
  * <a href="https://gcc.gnu.org/onlinedocs/cpp/">GCC CPP documentation</a>
  *
  * @author Tomas Zaluckij
- * @date Last modified 2019-03-01
+ * @date Last modified 2019-03-02
  */
 
 #include <stdlib.h>
