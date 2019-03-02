@@ -6,7 +6,7 @@
 #include "args.h"
 
 const char *argp_program_version =
-        "tcpp 0.1";
+        "tcpp 0.2";
 const char *argp_program_bug_address =
         "<mrtomaszal@gmail.com>";
 

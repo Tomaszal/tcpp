@@ -7,10 +7,10 @@ complex and challenging idea.
 
 [GCC CPP documentation](https://gcc.gnu.org/onlinedocs/cpp/)
 
+## Usage
+
 ```
 Usage: tcpp [OPTION...]
-Tomaszal's C preprocessor (TCPP) -- a program for preprocessing C computer
-programming language.
 
   -c, --keep_comments        Keep the comments instead of removing them
   -i, --input=<file>         Name of the "*.c" input <file>
@@ -20,9 +20,23 @@ programming language.
   -?, --help                 Give this help list
       --usage                Give a short usage message
   -V, --version              Print program version
+```
 
-Mandatory or optional arguments to long options are also mandatory or optional
-for any corresponding short options.
+## Building
 
-Report bugs to <mrtomaszal@gmail.com>.
+This project provides several Makefile configurations. It is meant to be compiled and used on a Linux stack (GCC, GNU Make).
+
+```
+Usage: make [OPTION]
+
+  make                Compiles the program into a 'tcpp' executable
+  make clean          Removes binaries (executables) and object files
+
+  make test_math      Test case 'math_functions.c'
+  make test_string    Test case 'string_functions.c'
+  make test_both      Both test cases
+
+  make test_math_c    Test case 'math_functions.c' with 'keep_comments'
+  make test_string_c  Test case 'string_functions.c' with 'keep_comments'
+  make test_both_c    Test both cases with 'keep_comments'
 ```

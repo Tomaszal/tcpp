@@ -1,13 +1,13 @@
 /**
- * @brief Tomaszal's C preprocessor (TCPP)
+ * Tomaszal's C preprocessor (TCPP)
  *
  * A C preprocessor implements the macro language used to transform C programs before they are compiled.
  *
  * This project is an attempt to recreate the essential parts of GCC's built in C preprocessor (CPP).
  *
- * GCC CPP documentation: https://gcc.gnu.org/onlinedocs/cpp/
+ * <a href="https://gcc.gnu.org/onlinedocs/cpp/">GCC CPP documentation</a>
  *
- * @author Tomas Zaluckij (@Tomaszal) <mrtomaszal@gmail.com>
+ * @author Tomas Zaluckij
  * @date Last modified 2019-03-01
  */
 
@@ -349,6 +349,8 @@ void write_token_list_to_file(TokenList *token_list, char *file_name) {
         return;
     }
 
+    verbose_printf("Writing tokens to %s.\n", file_name);
+
     Location location = {NULL, 0, 0};
 
     for (Token *token = token_list->front_token; token; token = token->next) {
@@ -540,10 +542,14 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
         return;
     }
 
-    char *file_path = malloc((strlen(token_list->front_token->location.file_name) + 1) * sizeof *file_path);
-    strcpy(file_path, token_list->front_token->location.file_name);
+    verbose_printf("Preprocessing file %s.\n", token_list->front_token->location.file_name);
 
-    for (char *file_name = &file_path[strlen(file_path)]; file_name != file_path; file_name -= sizeof *file_name) {
+    // Get the location of the current file for searching user header files
+    char *file_location = malloc((strlen(token_list->front_token->location.file_name) + 1) * sizeof *file_location);
+    strcpy(file_location, token_list->front_token->location.file_name);
+
+    for (char *file_name = &file_location[strlen(file_location)];
+         file_name != file_location; file_name -= sizeof *file_name) {
         if (*file_name == '/') {
             file_name[1] = '\0';
             break;
@@ -555,21 +561,27 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
     for (Token *token = token_list->front_token; token; token = token->next) {
         if (token->is_directive) {
             if (strcmp(token->string, "include") == 0) {
+                // Include statement
+
                 token = token->next;
 
                 char *file_name = NULL;
 
+                // Check if it is a user include
                 if (token->string[0] == '"') {
-                    file_name = malloc((strlen(file_path) + strlen(&token->string[1])) * sizeof *file_name);
-                    strcpy(file_name, file_path);
+                    file_name = malloc((strlen(file_location) + strlen(&token->string[1])) * sizeof *file_name);
+                    strcpy(file_name, file_location);
                     strncat(file_name, &token->string[1], strlen(&token->string[1]) - 1);
                 }
+
+                // TODO: check if it is a system include
 
                 if (!file_name) {
                     fprintf(stderr, "Could not find '%s'.\n", token->string);
                     continue;
                 }
 
+                // Add file path to the file vector
                 int file_vector_size = 0;
                 while ((*file_vector)[++file_vector_size]) {}
 
@@ -577,19 +589,16 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
                 (*file_vector)[file_vector_size] = file_name;
                 (*file_vector)[file_vector_size + 1] = NULL;
 
+                // Generate a raw token list from the file
                 TokenList *temp_token_list = tokenize_file((*file_vector)[file_vector_size]);
 
+                // Delete include statement tokens
                 token = token->prev->prev;
-
                 for (int i = 0; i < 3; i++) {
                     token = delete_token_from_list(token_list, token);
                 }
 
-                if (!token) {
-                    free(token_list);
-                    token_list = temp_token_list;
-                }
-
+                // Connect newly generated token list to the main token list
                 if (token->prev) {
                     token->prev->next = temp_token_list->front_token;
                     temp_token_list->front_token->prev = token->prev;
@@ -603,10 +612,12 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
                 free(temp_token_list);
 
             } else if (strcmp(token->string, "define") == 0) {
+                // Define statement
 
                 Token *start_token = token->prev;
                 token = token->next->next;
 
+                // Generate define's value
                 char *string = malloc(sizeof *string);
                 *string = '\0';
 
@@ -617,22 +628,30 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
                     token = delete_token_from_list(token_list, token);
                 }
 
+                // Map define's name to it's value
                 hash_map_insert_key(define_map, start_token->next->next->string, string);
 
+                // Delete define statement tokens
                 token = start_token;
                 for (int i = 0; i < 3; i++) {
                     token = delete_token_from_list(token_list, token);
                 }
             }
+
         } else {
+
+            // Check if current token is a defined key
             char *define = (char *) hash_map_get_key(define_map, token->string);
             if (define) {
+                // Calculate how much defined value shifted the line horizontally
                 int spacing_fix = (int) strlen(token->string) - (int) strlen(define);
 
+                // Replace current token's string with the defined value
                 free(token->string);
                 token->string = malloc(strlen(define) * sizeof token->string);
                 strcpy(token->string, define);
 
+                // Shift all tokens in the current line
                 Token *temp_token = token;
                 while ((temp_token = temp_token->next) && same_line(token->location, temp_token->location)) {
                     temp_token->location.column -= spacing_fix;
@@ -642,7 +661,7 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
     }
 
     delete_hash_map(define_map);
-    free(file_path);
+    free(file_location);
 }
 
 int main(int argc, char **argv) {
