@@ -8,7 +8,7 @@
  * <a href="https://gcc.gnu.org/onlinedocs/cpp/">GCC CPP documentation</a>
  *
  * @author Tomas Zaluckij
- * @date Last modified 2019-03-02
+ * @date Last modified 2019-03-03
  */
 
 #include <stdlib.h>
@@ -683,24 +683,33 @@ int main(int argc, char **argv) {
     // Parse program arguments
     args_parse(argc, argv);
 
+    // Create a file name vector to store accessed files between functions
     char **file_vector = malloc(2 * sizeof *file_vector);
     file_vector[0] = args->input_file;
     file_vector[1] = NULL;
 
+    // Generate a new raw token list from the input
     TokenList *token_list = tokenize_file(file_vector[0]);
 
+    // Print information about the input file
     normal_printf("%d non-empty lines found.\n", count_non_empty_lines(token_list));
     normal_printf("%d comments found.\n", count_comments(token_list));
 
+    // Delete the comments unless 'keep_comments' is set
     if (!args->keep_comments) {
         delete_comments(token_list);
     }
 
+    // Preprocess the raw token list and write it to the output file
     preprocess_token_list(token_list, &file_vector);
-
     write_token_list_to_file(token_list, args->output_file);
 
+    // Free allocated memory
     delete_token_list(token_list);
+    for (int i = 1; file_vector[i]; i++) {
+        free(file_vector[i]);
+    }
 
+    // Successfully exit the program
     exit(EXIT_SUCCESS);
 }
