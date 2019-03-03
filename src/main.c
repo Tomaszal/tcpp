@@ -592,6 +592,21 @@ void preprocess_token_list(TokenList *token_list, char ***file_vector) {
                 // Generate a raw token list from the file
                 TokenList *temp_token_list = tokenize_file((*file_vector)[file_vector_size]);
 
+                // Insert a spacer token after include
+                Token *spacer = calloc(1, sizeof *spacer);
+
+                spacer->location.file_name = token->location.file_name;
+                spacer->location.line = token->location.line + 1;
+
+                spacer->prev = token;
+                spacer->next = token->next;
+
+                if (token->next) {
+                    token->next->prev = spacer;
+                }
+
+                token->next = spacer;
+
                 // Delete include statement tokens
                 token = token->prev->prev;
                 for (int i = 0; i < 3; i++) {
