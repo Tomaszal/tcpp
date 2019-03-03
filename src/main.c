@@ -383,6 +383,8 @@ void write_token_list_to_file(TokenList *token_list, char *file_name) {
     }
 
     fprintf(ofs, "\n");
+
+    fclose(ofs);
 }
 
 /**
@@ -519,6 +521,8 @@ TokenList *tokenize_file(char *file_name) {
 
         insert_token(token_list, new_token(token_string, location));
     }
+
+    fclose(ifs);
 
     return token_list;
 }
